@@ -1,0 +1,81 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "yesterdays-panoramax"
+version = "0.1.0"
+description = "Publish a Yesterdays historical image archive to the Panoramax federation."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "AGPL-3.0-or-later"
+license-files = ["LICENSE"]
+authors = [{ name = "Open History Map" }]
+keywords = [
+    "django",
+    "stac",
+    "panoramax",
+    "geovisio",
+    "gis",
+    "openstreetmap",
+    "historical-photography",
+    "federation",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Web Environment",
+    "Framework :: Django",
+    "Framework :: Django :: 4.2",
+    "Framework :: Django :: 5.2",
+    "Framework :: Django :: 6.0",
+    "Framework :: Django :: 6.1",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Scientific/Engineering :: GIS",
+    "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
+]
+dependencies = [
+    "django>=4.2",
+    "edtf>=4.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/openhistorymap/yesterdays-panoramax"
+Source = "https://github.com/openhistorymap/yesterdays-panoramax"
+Issues = "https://github.com/openhistorymap/yesterdays-panoramax/issues"
+Changelog = "https://github.com/openhistorymap/yesterdays-panoramax/blob/main/CHANGELOG.md"
+Documentation = "https://github.com/openhistorymap/yesterdays-panoramax/blob/main/docs/index.md"
+
+[project.optional-dependencies]
+# The suite needs a PostGIS database: the adapter aggregates extents, filters
+# with spatial lookups, and builds vector tiles with ST_AsMVT.
+test = ["psycopg[binary]>=3.1"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/yesterdays_panoramax"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src", "tests", "docs", "README.md", "LICENSE", "CHANGELOG.md"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+# Prose is prose. Recent ruff reformats Python inside fenced blocks, which
+# fights the deliberate alignment in the docs.
+extend-exclude = ["docs"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "DJ"]
+
+[tool.ruff.lint.per-file-ignores]
+# The stub host app mirrors Yesterdays' own models field for field. Its job is
+# to be a faithful copy, not idiomatic Django -- "fixing" its style here would
+# make it diverge from the thing it exists to imitate, and hide a real
+# incompatibility. Same reasoning for the generated migration's long lines.
+"tests/images/models.py" = ["DJ001", "DJ008", "DJ012"]
+"tests/images/migrations/*" = ["E501"]
