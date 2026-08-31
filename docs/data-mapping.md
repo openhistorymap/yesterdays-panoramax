@@ -14,6 +14,10 @@ An image is published only if **all** of these hold:
 - it is not an aerial, and not flagged `will_not_georef`;
 - it has a `permalink`.
 
+...and it has not been excluded by an explicit
+[per-image ruling](per-image-control.md) — or, under
+`PANORAMAX_IMAGE_POLICY = "opt-in"`, it has been explicitly approved.
+
 A `Collection` with at least one such image becomes a STAC Collection; each
 eligible `Image` becomes a STAC Item.
 

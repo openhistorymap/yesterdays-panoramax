@@ -30,6 +30,11 @@ from django.utils import timezone
 
 from . import conf, dates, hostmodels, ids, queries
 
+# Re-exported so Django registers it: the app registry only imports
+# `<app>.models`, and ImageDecision lives in its own module to keep
+# queries -> decisions from becoming queries -> models -> queries.
+from .decisions import ImageDecision  # noqa: F401
+
 
 class PublishedCollection(models.Model):
     # The FK is for convenience; collection_pk is the identity. A deleted
@@ -69,9 +74,17 @@ class PublishedCollection(models.Model):
     class Meta:
         ordering = ["updated", "collection_pk"]
         indexes = [
+            # Named explicitly so the model agrees with the hand-written
+            # migration; left to Django, these get hashed names and every
+            # downstream `makemigrations --check` reports phantom drift.
             # The harvester's query: updated > T, ordered by updated.
-            models.Index(fields=["updated", "collection_pk"]),
-            models.Index(fields=["published", "updated"]),
+            models.Index(
+                fields=["updated", "collection_pk"],
+                name="panoramax_updated_pk_idx",
+            ),
+            models.Index(
+                fields=["published", "updated"], name="panoramax_pub_updated_idx"
+            ),
         ]
         verbose_name = "published collection"
 

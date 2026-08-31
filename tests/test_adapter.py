@@ -11,11 +11,13 @@ not.
 import uuid
 
 from django.contrib.gis.geos import Point
+from django.core.exceptions import ImproperlyConfigured
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from tests.images.models import Collection, Georeference, Image, License, Source
-from yesterdays_panoramax import dates, filters, ids
+from yesterdays_panoramax import api, conf, dates, filters, ids
+from yesterdays_panoramax.decisions import EXCLUDE, INCLUDE, ImageDecision
 from yesterdays_panoramax.models import PublishedCollection
 
 FEDERATED = {
@@ -580,3 +582,153 @@ class VectorTileTests(FederationTestCase):
             )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.content, b"")
+
+
+@override_settings(**FEDERATED)
+class ImageDecisionTests(FederationTestCase):
+    """Per-image federation control.
+
+    The feature has to be inert until used: an installation that never rules on
+    anything must behave exactly as it did before the model existed.
+    """
+
+    def published_ids(self):
+        body = self.client.get(reverse("panoramax:search")).json()
+        return {
+            feature["properties"]["yesterdays:image_id"] for feature in body["features"]
+        }
+
+    # -- opt-out (the default) ------------------------------------------------
+
+    def test_an_image_with_no_ruling_is_unaffected(self):
+        """Django's exclude() across a nullable reverse relation must keep the
+        rows that have no related object at all."""
+        image = self.publish()
+        self.assertEqual(self.published_ids(), {image.pk})
+
+    def test_excluding_holds_an_image_back(self):
+        image = self.publish()
+        with self.captureOnCommitCallbacks(execute=True):
+            api.exclude_image(image, reason="Depicted person objected")
+        self.assertEqual(self.published_ids(), set())
+
+    def test_only_the_excluded_image_is_held_back(self):
+        kept = self.publish()
+        dropped = self.make_image(title="Second Street")
+        self.georeference(dropped)
+        with self.captureOnCommitCallbacks(execute=True):
+            api.exclude_image(dropped)
+        self.assertEqual(self.published_ids(), {kept.pk})
+
+    def test_clearing_restores_an_image(self):
+        image = self.publish()
+        api.exclude_image(image)
+        with self.captureOnCommitCallbacks(execute=True):
+            self.assertTrue(api.clear_decision(image))
+        self.assertEqual(self.published_ids(), {image.pk})
+
+    def test_approving_under_opt_out_records_without_changing_anything(self):
+        image = self.publish()
+        with self.captureOnCommitCallbacks(execute=True):
+            api.include_image(image, reason="Reviewed by the archivist")
+        self.assertEqual(api.decision_for(image), INCLUDE)
+        self.assertEqual(self.published_ids(), {image.pk})
+
+    # -- opt-in ---------------------------------------------------------------
+
+    def test_opt_in_publishes_nothing_until_approved(self):
+        image = self.publish()
+        with override_settings(PANORAMAX_IMAGE_POLICY=conf.OPT_IN):
+            self.assertEqual(self.published_ids(), set())
+            with self.captureOnCommitCallbacks(execute=True):
+                api.include_image(image)
+            self.assertEqual(self.published_ids(), {image.pk})
+
+    def test_approval_does_not_override_the_licence_gate(self):
+        """The licence gate is a legal control, not a default. A human ticking
+        a box must not be able to walk past it."""
+        image = self.make_image(license=self.other_license)
+        self.georeference(image)
+        api.include_image(image)
+        with override_settings(PANORAMAX_IMAGE_POLICY=conf.OPT_IN):
+            self.assertEqual(self.published_ids(), set())
+        self.assertEqual(self.published_ids(), set())
+
+    def test_approval_does_not_conjure_a_georeference(self):
+        image = self.make_image()
+        api.include_image(image)
+        with override_settings(PANORAMAX_IMAGE_POLICY=conf.OPT_IN):
+            self.assertFalse(api.is_published(image))
+
+    def test_an_unknown_policy_is_refused(self):
+        with override_settings(PANORAMAX_IMAGE_POLICY="opt-maybe"):
+            with self.assertRaises(ImproperlyConfigured):
+                conf.image_policy()
+
+    # -- propagation ----------------------------------------------------------
+
+    def test_a_ruling_bumps_the_collection(self):
+        """Nothing in `images` is written, so without this the decision would
+        sit in the database and never reach the federation."""
+        image = self.publish()
+        before = PublishedCollection.objects.get().updated
+        with self.captureOnCommitCallbacks(execute=True):
+            api.exclude_image(image)
+        self.assertGreater(PublishedCollection.objects.get().updated, before)
+
+    def test_excluding_the_last_image_tombstones_the_collection(self):
+        image = self.publish()
+        with self.captureOnCommitCallbacks(execute=True):
+            api.exclude_image(image)
+        row = PublishedCollection.objects.get()
+        self.assertFalse(row.published)
+        self.assertTrue(row.is_tombstone)
+
+    def test_an_excluded_image_leaves_the_item_listing(self):
+        """Which is what removes it from the federation: the harvester replaces
+        a collection's items wholesale on every pass."""
+        kept = self.publish()
+        dropped = self.make_image(title="Second Street")
+        self.georeference(dropped)
+        with self.captureOnCommitCallbacks(execute=True):
+            api.exclude_image(dropped)
+
+        row = PublishedCollection.objects.get()
+        body = self.client.get(reverse("panoramax:items", args=[str(row.uuid)])).json()
+        self.assertEqual(
+            [f["properties"]["yesterdays:image_id"] for f in body["features"]],
+            [kept.pk],
+        )
+        self.assertEqual(row.item_count, 1)
+
+    # -- the model itself -----------------------------------------------------
+
+    def test_is_published_reports_the_whole_test_not_just_the_ruling(self):
+        image = self.publish()
+        self.assertTrue(api.is_published(image))
+        with self.captureOnCommitCallbacks(execute=True):
+            api.exclude_image(image)
+        self.assertFalse(api.is_published(image))
+
+    def test_a_ruling_is_replaced_not_duplicated(self):
+        image = self.publish()
+        api.exclude_image(image, reason="first")
+        api.include_image(image, reason="second")
+        self.assertEqual(ImageDecision.objects.count(), 1)
+        self.assertEqual(api.decision_for(image), INCLUDE)
+
+    def test_deleting_an_image_takes_its_ruling_with_it(self):
+        image = self.publish()
+        api.exclude_image(image)
+        with self.captureOnCommitCallbacks(execute=True):
+            image.delete()
+        self.assertEqual(ImageDecision.objects.count(), 0)
+
+    def test_decision_for_is_none_when_nobody_has_ruled(self):
+        image = self.publish()
+        self.assertIsNone(api.decision_for(image))
+
+    def test_helpers_accept_a_primary_key(self):
+        image = self.publish()
+        api.exclude_image(image.pk)
+        self.assertEqual(api.decision_for(image.pk), EXCLUDE)

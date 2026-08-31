@@ -29,6 +29,17 @@ so a routine reconcile does not look like a site-wide edit.
 Running it on a schedule (nightly, say) is a reasonable safety net against
 missed signals.
 
+## Ruling on individual images
+
+```
+manage.py panoramax_decide exclude --image 17 --reason "rights unclear"
+manage.py panoramax_decide include --collection 42
+manage.py panoramax_decide clear --collection 42
+```
+
+Add `--dry-run` to see the count without changing anything. Full detail in
+[per-image control](per-image-control.md).
+
 ## Inspecting what the federation has been told
 
 `PublishedCollection` is registered in the Django admin, read-only — every

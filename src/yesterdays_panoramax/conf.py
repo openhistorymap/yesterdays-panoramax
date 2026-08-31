@@ -10,6 +10,7 @@ unpublished instance, which is the safe default.
 import uuid
 
 from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 
 # Fallback namespace for the identifier scheme. Deployments should set
 # PANORAMAX_UUID_NAMESPACE to a value of their own and never change it
@@ -26,6 +27,13 @@ DEFAULT_LICENSE_ALLOWLIST: dict[str, str] = {}
 # What a collection's licence is called when its images do not all share one.
 # STAC reserves "other" for exactly this.
 MIXED_LICENSE = "other"
+
+#: Publish everything the eligibility rules allow, minus explicit exclusions.
+OPT_OUT = "opt-out"
+#: Publish nothing but explicitly approved images. For archives whose rights
+#: are decided picture by picture rather than licence by licence.
+OPT_IN = "opt-in"
+IMAGE_POLICIES = (OPT_OUT, OPT_IN)
 
 DEFAULT_PAGE_SIZE = 100
 MAX_PAGE_SIZE = 1000
@@ -126,6 +134,26 @@ def confidence_accuracy() -> dict[str, float]:
     """
     default = {"high": 25.0, "medium": 100.0, "low": 500.0}
     return {**default, **_get("PANORAMAX_CONFIDENCE_ACCURACY_M", {})}
+
+
+def image_policy() -> str:
+    """How per-image decisions combine with the eligibility rules.
+
+    ``"opt-out"`` (the default) publishes everything eligible except images
+    explicitly excluded. ``"opt-in"`` inverts it: nothing is published until an
+    image has been explicitly approved, which is what an archive wants when
+    rights are settled picture by picture rather than licence by licence.
+
+    A bad value raises rather than falling back. Silently defaulting a typo to
+    ``opt-out`` would publish an entire archive that somebody meant to curate,
+    and the federation does not forget quickly.
+    """
+    value = str(_get("PANORAMAX_IMAGE_POLICY", OPT_OUT)).strip().lower()
+    if value not in IMAGE_POLICIES:
+        raise ImproperlyConfigured(
+            f"PANORAMAX_IMAGE_POLICY must be one of {IMAGE_POLICIES!r}, not {value!r}"
+        )
+    return value
 
 
 def logo() -> str | None:

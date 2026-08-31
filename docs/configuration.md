@@ -39,6 +39,21 @@ Keys are matched case-insensitively against `License.name`. A plain sequence of
 names is also accepted, in which case every listed licence is published under
 `PANORAMAX_LICENSE_ID`.
 
+## Per-image control
+
+| Setting | Default |
+| --- | --- |
+| `PANORAMAX_IMAGE_POLICY` | `"opt-out"` |
+
+`"opt-out"` publishes everything eligible except images explicitly excluded;
+`"opt-in"` publishes nothing until an image has been explicitly approved. Both
+are driven by the `ImageDecision` model and the `yesterdays_panoramax.api`
+helpers — see [per-image control](per-image-control.md). An unrecognised value
+raises `ImproperlyConfigured` rather than quietly falling back.
+
+The feature is inert until used: with no decisions recorded, `opt-out` behaves
+exactly as it did before the model existed.
+
 ## Identity
 
 | Setting | Default |

@@ -74,6 +74,19 @@ jobs:
       - name: Report the versions actually under test
         run: python -c "import django, sys; print(sys.version); print(django.get_version())"
 
+      - name: Check the hand-written migrations match the models
+        # The migrations in this package are written by hand (a library has no
+        # project to run makemigrations against), so drift is easy and would
+        # surface as a phantom migration in every downstream project's CI.
+        run: python -m django makemigrations panoramax --check --dry-run
+        env:
+          DJANGO_SETTINGS_MODULE: tests.settings
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: panoramax_test
+
       - name: Run the suite
         run: python -m django test tests --verbosity 2
         env:

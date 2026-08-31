@@ -8,6 +8,30 @@ function of it and changing them orphans everything already harvested.
 
 ## [Unreleased]
 
+### Added
+
+- Per-image federation control. `ImageDecision` records an explicit ruling to
+  include or exclude one image, for judgements the licence and visibility rules
+  cannot express. Rows exist only for images somebody has ruled on, so the
+  feature is inert until used.
+- `PANORAMAX_IMAGE_POLICY`, either `"opt-out"` (the default: publish everything
+  eligible minus exclusions) or `"opt-in"` (publish nothing until approved, for
+  archives whose rights are settled picture by picture). An unrecognised value
+  raises rather than falling back to publishing.
+- `yesterdays_panoramax.api` — `exclude_image`, `include_image`,
+  `clear_decision`, `decision_for`, `is_published` — a stable surface for the
+  host to drive the control from its own views and admin actions.
+- `panoramax_decide` management command for ruling on images in bulk, by id or
+  by collection, with `--dry-run`.
+- Editable Django admin for `ImageDecision`, recording who decided and why.
+- CI now runs `makemigrations --check`, since this package's migrations are
+  written by hand and drift would surface as a phantom migration downstream.
+
+### Notes
+
+- An exclusion is absolute; an approval is not an override. An approved image
+  still has to satisfy the licence, visibility, date and georeference rules.
+
 ## [0.1.0] — 2026-08-31
 
 First release. Extracted from the Yesterdays repository into a standalone,

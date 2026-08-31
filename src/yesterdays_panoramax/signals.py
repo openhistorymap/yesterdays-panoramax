@@ -22,6 +22,7 @@ from django.db.models.signals import post_delete, post_save, pre_save
 from django.dispatch import receiver
 
 from . import hostmodels
+from .decisions import ImageDecision
 from .models import PublishedCollection
 
 logger = logging.getLogger(__name__)
@@ -120,6 +121,18 @@ def federation_on_georeference_change(sender, instance, **kwargs):
 
     On a cascading delete the image row may already be gone, in which case the
     Image receiver below covers the same collection.
+    """
+    _schedule([_collection_id_of_image(instance.image_id)])
+
+
+@receiver(post_save, sender=ImageDecision)
+@receiver(post_delete, sender=ImageDecision)
+def federation_on_decision_change(sender, instance, **kwargs):
+    """A ruling on one image changes what its collection publishes.
+
+    Without this the decision would sit in the database and never reach the
+    federation: the harvester only re-fetches a collection whose `updated` has
+    moved, and nothing in `images` was written.
     """
     _schedule([_collection_id_of_image(instance.image_id)])
 

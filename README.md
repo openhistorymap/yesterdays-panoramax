@@ -89,6 +89,32 @@ that starts empty. An instance with the flag on and no allowlist publishes
 nothing. That is deliberate — Panoramax's federation policy expects open
 licensing, and only a human can say which of an archive's licences qualify.
 
+## Ruling on individual photographs
+
+Licences and visibility flags cannot express a judgement about one particular
+picture — a portrait whose subject asked not to have it republished, a scan
+whose provenance turned out to be murky. So decisions can also be made per
+image:
+
+```python
+from yesterdays_panoramax import api
+
+api.exclude_image(image, reason="Depicted person objected", by=request.user)
+```
+
+Or, for archives whose rights are settled picture by picture rather than
+licence by licence, invert the default so nothing is published until it is
+approved:
+
+```python
+PANORAMAX_IMAGE_POLICY = "opt-in"
+```
+
+An exclusion is absolute; an approval is not an override — an approved image
+still has to satisfy the licence, visibility, date and georeference rules. The
+feature is inert until used. See
+[per-image control](docs/per-image-control.md).
+
 ## Joining the federation
 
 Serving the API is only half of it. To actually be harvested, open an issue on
@@ -115,6 +141,7 @@ Before you do, two questions the code cannot answer for you:
 | [Configuration](docs/configuration.md) | Every setting, and what it does |
 | [How it works](docs/how-it-works.md) | The federation model and the harvester contract |
 | [Data mapping](docs/data-mapping.md) | What gets published, and the judgement calls |
+| [Per-image control](docs/per-image-control.md) | Holding back, or approving, one photograph |
 | [Endpoints](docs/endpoints.md) | The API surface |
 | [Operations](docs/operations.md) | Backfilling, withdrawal, troubleshooting |
 | [Host contract](docs/host-contract.md) | What the package needs from `images` |

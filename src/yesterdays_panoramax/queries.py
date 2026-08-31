@@ -28,6 +28,7 @@ from django.db.models import OuterRef, Subquery
 from django.db.models.functions import Lower
 
 from . import conf, hostmodels
+from .decisions import EXCLUDE, INCLUDE
 
 
 def _latest_georeference():
@@ -81,7 +82,20 @@ def federatable_images():
         .exclude(edtf_date="")
         .exclude(permalink="")
     )
+    queryset = apply_image_policy(queryset)
     return with_georeference(queryset).filter(geo_point__isnull=False)
+
+
+def apply_image_policy(queryset):
+    """Apply per-image rulings on top of the property-based rules.
+
+    Under ``opt-out`` an image with no ruling is unaffected -- which is what
+    makes the feature optional: until somebody rules on something, this filter
+    changes nothing.
+    """
+    if conf.image_policy() == conf.OPT_IN:
+        return queryset.filter(panoramax_decision__decision=INCLUDE)
+    return queryset.exclude(panoramax_decision__decision=EXCLUDE)
 
 
 def federatable_images_for(collection_pk):

@@ -11,6 +11,8 @@ archive to the [Panoramax](https://panoramax.fr/) federation.
   contract the harvester imposes
 - **[Data mapping](data-mapping.md)** — what is published, and the judgement
   calls behind it
+- **[Per-image control](per-image-control.md)** — holding back, or approving,
+  one photograph at a time
 - **[Endpoints](endpoints.md)** — the API surface
 - **[Operations](operations.md)** — backfilling, withdrawal, troubleshooting
 - **[Host contract](host-contract.md)** — what this package needs from `images`
