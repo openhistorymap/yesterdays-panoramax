@@ -11,10 +11,14 @@ on the repository. Adding required reviewers to `pypi` under **Settings →
 Environments** is worth considering, since a version cannot be reused once it
 is taken.
 
-The PyPI half needs an account login and cannot be automated. Because the
-project does not exist on either index yet, what you create is a **pending
-publisher** — on PyPI under *Your projects → Publishing*, and again on
-TestPyPI:
+**PyPI is configured and 0.1.0 shipped through it**, so nothing more is needed
+to cut a release. **TestPyPI is not**: the rehearsal path below will fail with
+`invalid-publisher` until a pending publisher is added there too.
+
+The PyPI half needs an account login and cannot be automated. Since a project
+that does not exist on an index yet has nothing to attach a publisher to, what
+you create there is a **pending publisher** — under *Your projects →
+Publishing*:
 
 | Field | PyPI | TestPyPI |
 | --- | --- | --- |
@@ -24,12 +28,9 @@ TestPyPI:
 | Workflow name | `publish.yml` | `publish.yml` |
 | Environment name | `pypi` | `testpypi` |
 
-These are not guesses. A dry run against TestPyPI on 2026-08-31 produced a
-valid OIDC token whose claims were `repository: openhistorymap/yesterdays-panoramax`,
-`workflow_ref: .../.github/workflows/publish.yml@refs/heads/main`,
-`environment: testpypi` — and failed only with `invalid-publisher`, meaning
-PyPI had nothing registered to match. Everything upstream of the handshake
-(build, `twine check --strict`, artefact hand-off) already works.
+These are not guesses: they are the claims GitHub actually presents. The
+`pypi` column is confirmed working by the 0.1.0 release; the `testpypi` column
+is the same shape with the environment name changed.
 
 ## Cutting a release
 
