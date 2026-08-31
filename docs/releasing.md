@@ -4,33 +4,25 @@ Publishing is automated by `.github/workflows/publish.yml` and uses PyPI
 [Trusted Publishing](https://docs.pypi.org/trusted-publishers/) — an OIDC token
 minted per run, so no API token is stored in this repository.
 
-## One-time setup
+## Setup
 
-The GitHub half is already done: the `pypi` and `testpypi` environments exist
-on the repository. Adding required reviewers to `pypi` under **Settings →
+Already done, and confirmed working by the 0.1.0 release: the `pypi`
+environment exists on the repository and PyPI has a matching trusted publisher.
+Nothing needs configuring to cut a release.
+
+For the record, and in case it ever has to be rebuilt, the publisher on PyPI is
+registered under *Your projects → Publishing* as:
+
+| Field | Value |
+| --- | --- |
+| Owner | `openhistorymap` |
+| Repository name | `yesterdays-panoramax` |
+| Workflow name | `publish.yml` |
+| Environment name | `pypi` |
+
+Adding required reviewers to the `pypi` environment under **Settings →
 Environments** is worth considering, since a version cannot be reused once it
 is taken.
-
-**PyPI is configured and 0.1.0 shipped through it**, so nothing more is needed
-to cut a release. **TestPyPI is not**: the rehearsal path below will fail with
-`invalid-publisher` until a pending publisher is added there too.
-
-The PyPI half needs an account login and cannot be automated. Since a project
-that does not exist on an index yet has nothing to attach a publisher to, what
-you create there is a **pending publisher** — under *Your projects →
-Publishing*:
-
-| Field | PyPI | TestPyPI |
-| --- | --- | --- |
-| PyPI project name | `yesterdays-panoramax` | `yesterdays-panoramax` |
-| Owner | `openhistorymap` | `openhistorymap` |
-| Repository name | `yesterdays-panoramax` | `yesterdays-panoramax` |
-| Workflow name | `publish.yml` | `publish.yml` |
-| Environment name | `pypi` | `testpypi` |
-
-These are not guesses: they are the claims GitHub actually presents. The
-`pypi` column is confirmed working by the 0.1.0 release; the `testpypi` column
-is the same shape with the environment name changed.
 
 ## Cutting a release
 
@@ -44,16 +36,22 @@ The workflow builds an sdist and a wheel, runs `twine check --strict`, and
 means the tag, the changelog and the artefact would all disagree, and PyPI will
 not let a version be reused once taken).
 
-## Dry run
+## If a publish fails
 
-To rehearse against TestPyPI without tagging, run the **Publish** workflow
-manually with `target: testpypi`, then:
+Re-run the failed run rather than tagging again:
 
 ```
-pip install --index-url https://test.pypi.org/simple/ \
-            --extra-index-url https://pypi.org/simple/ \
-            yesterdays-panoramax
+gh run rerun <run-id> --failed
 ```
+
+It replays as the same release event, so the tag-vs-version check still applies
+and the version number is not consumed by the failed attempt — PyPI only
+records a version once a file has actually been uploaded.
+
+A GitHub Release is the workflow's only trigger, on purpose. A manual dispatch
+would publish whatever version happened to be in `pyproject.toml` on whatever
+branch it ran from, and would bypass the tag check, which has no tag to compare
+against outside a release. That mistake cannot be undone.
 
 ## Versioning
 

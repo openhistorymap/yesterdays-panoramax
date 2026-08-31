@@ -3,16 +3,18 @@ name: Publish
 # Releasing is documented in docs/releasing.md. In short: bump the version in
 # pyproject.toml, update CHANGELOG.md, then publish a GitHub Release whose tag
 # is `v<version>`.
+#
+# A GitHub Release is the only trigger, deliberately. A manual dispatch would
+# publish whatever version happened to be in pyproject.toml on whatever branch
+# it was run from, and would bypass the tag-vs-version check below, which only
+# has a tag to check against on a release. PyPI never lets a version number be
+# reused, so that mistake is not recoverable. To retry a release whose publish
+# failed for some transient reason, re-run the failed run itself
+# (`gh run rerun <id> --failed`): it replays as the same release event, guard
+# and all.
 on:
   release:
     types: [published]
-  workflow_dispatch:
-    inputs:
-      target:
-        description: Index to publish to
-        type: choice
-        options: [testpypi, pypi]
-        default: testpypi
 
 jobs:
   build:
@@ -34,7 +36,6 @@ jobs:
         # A mismatch here means the tag, the changelog and the artefact would
         # all disagree, and PyPI will not let the version be reused once it is
         # taken. Cheaper to fail now.
-        if: github.event_name == 'release'
         run: |
           version=$(python -c "import tomllib,pathlib; print(tomllib.loads(pathlib.Path('pyproject.toml').read_text())['project']['version'])")
           tag="${GITHUB_REF_NAME#v}"
@@ -49,34 +50,15 @@ jobs:
           name: distributions
           path: dist/
 
-  testpypi:
-    needs: build
-    if: github.event_name == 'workflow_dispatch' && inputs.target == 'testpypi'
-    runs-on: ubuntu-latest
-    environment:
-      name: testpypi
-      url: https://test.pypi.org/p/yesterdays-panoramax
-    permissions:
-      # Trusted Publishing: the OIDC token replaces a long-lived API token, so
-      # no PyPI credential is ever stored in this repository.
-      id-token: write
-    steps:
-      - uses: actions/download-artifact@v8
-        with:
-          name: distributions
-          path: dist/
-      - uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          repository-url: https://test.pypi.org/legacy/
-
   pypi:
     needs: build
-    if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.target == 'pypi')
     runs-on: ubuntu-latest
     environment:
       name: pypi
       url: https://pypi.org/p/yesterdays-panoramax
     permissions:
+      # Trusted Publishing: the OIDC token replaces a long-lived API token, so
+      # no PyPI credential is ever stored in this repository.
       id-token: write
     steps:
       - uses: actions/download-artifact@v8
